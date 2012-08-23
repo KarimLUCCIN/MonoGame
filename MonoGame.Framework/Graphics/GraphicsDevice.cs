@@ -191,7 +191,10 @@ namespace Microsoft.Xna.Framework.Graphics
 		const RenderbufferTarget GLRenderbuffer = RenderbufferTarget.RenderbufferExt;
 		const FramebufferAttachment GLDepthAttachment = FramebufferAttachment.DepthAttachmentExt;
 		const FramebufferAttachment GLStencilAttachment = FramebufferAttachment.StencilAttachment;
-		const FramebufferAttachment GLColorAttachment0 = FramebufferAttachment.ColorAttachment0;
+        const FramebufferAttachment GLColorAttachment0 = FramebufferAttachment.ColorAttachment0;
+        const FramebufferAttachment GLColorAttachment1 = FramebufferAttachment.ColorAttachment1;
+        const FramebufferAttachment GLColorAttachment2 = FramebufferAttachment.ColorAttachment2;
+        const FramebufferAttachment GLColorAttachment3 = FramebufferAttachment.ColorAttachment3;
 		const GetPName GLFramebufferBinding = GetPName.FramebufferBinding;
 		const RenderbufferStorage GLDepthComponent16 = RenderbufferStorage.DepthComponent16;
 		const RenderbufferStorage GLDepthComponent24 = RenderbufferStorage.DepthComponent24;
@@ -1068,6 +1071,8 @@ namespace Microsoft.Xna.Framework.Graphics
             ApplyRenderTargets(renderTargets);
         }
 
+        DrawBuffersEnum[] drawBuffers = new DrawBuffersEnum[] { DrawBuffersEnum.ColorAttachment0, DrawBuffersEnum.ColorAttachment1, DrawBuffersEnum.ColorAttachment2, DrawBuffersEnum.ColorAttachment3 };
+
         internal void ApplyRenderTargets(RenderTargetBinding[] renderTargets)
         {
             // The render target is really changing now.
@@ -1089,7 +1094,11 @@ namespace Microsoft.Xna.Framework.Graphics
                 lock (_d3dContext) 
                     _d3dContext.OutputMerger.SetTargets(_currentDepthStencilView, _currentRenderTargets);                
 #elif OPENGL
-				GL.BindFramebuffer(GLFramebuffer, this.glFramebuffer);
+                GL.BindFramebuffer(GLFramebuffer, this.glFramebuffer);
+
+#if(!GLES)
+                GL.DrawBuffers(1, drawBuffers);
+#endif
 #endif
 
                 clearTarget = true;
@@ -1134,8 +1143,19 @@ namespace Microsoft.Xna.Framework.Graphics
 #endif
 				}
 
-				GL.BindFramebuffer(GLFramebuffer, renderTarget.glFramebuffer);
+                GL.BindFramebuffer(GLFramebuffer, renderTarget.glFramebuffer);
 				GL.FramebufferTexture2D(GLFramebuffer, GLColorAttachment0, TextureTarget.Texture2D, renderTarget.glTexture, 0);
+                                
+#if(!GLES)
+                /* Multi render target */
+                for (int i = 1; i < _currentRenderTargetBindings.Length; i++)
+                {
+                    GL.BindTexture(TextureTarget.Texture2D, _currentRenderTargetBindings[i].RenderTarget.glTexture);
+                    GL.FramebufferTexture2D(FramebufferTarget.DrawFramebuffer, FramebufferAttachment.ColorAttachment0 + i, TextureTarget.Texture2D,
+                        _currentRenderTargetBindings[i].RenderTarget.glTexture, 0);
+                }
+#endif
+
 				if (renderTarget.DepthStencilFormat != DepthFormat.None)
 				{
 					GL.FramebufferRenderbuffer(GLFramebuffer, GLDepthAttachment, GLRenderbuffer, renderTarget.glDepthStencilBuffer);
@@ -1158,13 +1178,17 @@ namespace Microsoft.Xna.Framework.Graphics
 					}
 					throw new InvalidOperationException(message);
 				}
+
+#if(!GLES)
+                GL.DrawBuffers(_currentRenderTargetBindings.Length, drawBuffers); 
+#endif
                                 
 #endif
                 // Set the viewport to the size of the first render target.
                 Viewport = new Viewport(0, 0, renderTarget.Width, renderTarget.Height);
 
                 // We clear the render target if asked.
-                clearTarget = renderTarget.RenderTargetUsage != RenderTargetUsage.DiscardContents;
+                clearTarget = renderTarget.RenderTargetUsage == RenderTargetUsage.DiscardContents;
             }
 
             // In XNA 4, because of hardware limitations on Xbox, when

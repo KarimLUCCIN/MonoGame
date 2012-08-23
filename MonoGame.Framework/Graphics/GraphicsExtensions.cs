@@ -476,6 +476,16 @@ namespace Microsoft.Xna.Framework.Graphics
 				glFormat = PixelFormat.Luminance;
 				glType = PixelType.UnsignedByte;
 				break;
+            case SurfaceFormat.Rg32:
+                glInternalFormat = PixelInternalFormat.Rg32f;
+                glFormat = PixelFormat.Rg;
+                glType = PixelType.Short;
+                break;
+            case SurfaceFormat.Single:
+                glInternalFormat = PixelInternalFormat.R32f;
+                glFormat = PixelFormat.Red;
+                glType = PixelType.Float;
+                break;
 #if !IPHONE && !ANDROID
 			case SurfaceFormat.Dxt1:
 				glInternalFormat = PixelInternalFormat.CompressedRgbaS3tcDxt1Ext;
