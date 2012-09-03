@@ -141,7 +141,7 @@ namespace Microsoft.Xna.Framework.Graphics
         /// <summary>
         /// The active vertex shader.
         /// </summary>
-        internal DXShader _vertexShader;
+        internal Shader _vertexShader;
 
         private readonly Dictionary<ulong, SharpDX.Direct3D11.InputLayout> _inputLayouts = new Dictionary<ulong, SharpDX.Direct3D11.InputLayout>();
 
@@ -160,7 +160,9 @@ namespace Microsoft.Xna.Framework.Graphics
 		internal static int attributeNormal = 4;
 		internal static int attributeBlendIndicies = 5;
 		internal static int attributeBlendWeight = 6;
-		internal static int attributeTexCoord = 7; //must be the last one, texture index locations are added to it
+		internal static int attributeBinormal = 7;
+		internal static int attributeTangent = 8;
+		internal static int attributeTexCoord = 9; //must be the last one, texture index locations are added to it
 
         private uint VboIdArray;
         private uint VboIdElement;
@@ -281,17 +283,18 @@ namespace Microsoft.Xna.Framework.Graphics
 			}
 		}
 
-        public GraphicsDevice()
-        {
-            // Initialize the main viewport
-            _viewport = new Viewport(0, 0,
+        public GraphicsDevice ()
+		{
+			// Initialize the main viewport
+			_viewport = new Viewport (0, 0,
 			                         DisplayMode.Width, DisplayMode.Height);
-            _viewport.MaxDepth = 1.0f;
+			_viewport.MaxDepth = 1.0f;
 
-            Textures = new TextureCollection(16);
-            SamplerStates = new SamplerStateCollection(16);
+			Textures = new TextureCollection (16);
+			SamplerStates = new SamplerStateCollection (16);
 
-            PresentationParameters = new PresentationParameters();
+			PresentationParameters = new PresentationParameters ();
+			PresentationParameters.DepthStencilFormat = DepthFormat.Depth24;
         }
 
         internal void Initialize()
@@ -753,6 +756,12 @@ namespace Microsoft.Xna.Framework.Graphics
 
 #elif OPENGL
 
+            // GL.Clear() obeys the scissor rectangle where as in XNA/DirectX
+            // it does not.  So make sure scissor rect is set to the viewport
+            // bounds before we do the clear.
+		    var prevScissorRect = ScissorRectangle;
+            ScissorRectangle = _viewport.Bounds;
+
 			GL.ClearColor (color.X, color.Y, color.Z, color.W);
 
 			ClearBufferMask bufferMask = 0;
@@ -777,19 +786,13 @@ namespace Microsoft.Xna.Framework.Graphics
 #else
 			GL.Clear (bufferMask);
 #endif
-#endif // OPENGL
-        }
+
+            // Restore the scissor rectangle.
+		    ScissorRectangle = prevScissorRect;
+#endif
+		    // OPENGL
+		}
 		
-        public void Clear(ClearOptions options, Color color, float depth, int stencil, Rectangle[] regions)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Clear(ClearOptions options, Vector4 color, float depth, int stencil, Rectangle[] regions)
-        {
-            throw new NotImplementedException();
-        }
-
         public void Dispose()
         {
             Dispose(true);
@@ -975,7 +978,7 @@ namespace Microsoft.Xna.Framework.Graphics
         {
             get
             {
-                throw new NotImplementedException();
+                return GraphicsDeviceStatus.Normal;
             }
         }
 
@@ -1000,7 +1003,7 @@ namespace Microsoft.Xna.Framework.Graphics
                 lock (_d3dContext) 
                     _d3dContext.Rasterizer.SetViewports(viewport);
 #elif OPENGL
-				GL.Viewport (value.X, value.Y, value.Width, value.Height);
+                GL.Viewport (value.X, value.Y, value.Width, value.Height);
 #if GLES
                 GL.DepthRange(value.MinDepth, value.MaxDepth);
 #else
@@ -1349,7 +1352,7 @@ namespace Microsoft.Xna.Framework.Graphics
             _d3dContext.InputAssembler.InputLayout = GetInputLayout(_vertexShader, _vertexBuffer.VertexDeclaration);
         }
 
-        private SharpDX.Direct3D11.InputLayout GetInputLayout(DXShader shader, VertexDeclaration decl)
+        private SharpDX.Direct3D11.InputLayout GetInputLayout(Shader shader, VertexDeclaration decl)
         {
             SharpDX.Direct3D11.InputLayout layout;
 
@@ -1458,8 +1461,10 @@ namespace Microsoft.Xna.Framework.Graphics
 			
 #elif OPENGL
 
-			var indexElementType = DrawElementsType.UnsignedShort;
-			var indexElementSize = 2;
+            var shortIndices = _indexBuffer.IndexElementSize == IndexElementSize.SixteenBits;
+
+			var indexElementType = shortIndices ? DrawElementsType.UnsignedShort : DrawElementsType.UnsignedInt;
+            var indexElementSize = shortIndices ? 2 : 4;
 			var indexOffsetInBytes = (IntPtr)(startIndex * indexElementSize);
 			var indexElementCount = GetElementCountArray(primitiveType, primitiveCount);
 			var target = PrimitiveTypeGL(primitiveType);
