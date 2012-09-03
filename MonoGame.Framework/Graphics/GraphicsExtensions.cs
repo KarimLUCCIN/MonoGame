@@ -498,12 +498,6 @@ namespace Microsoft.Xna.Framework.Graphics
 				glInternalFormat = PixelInternalFormat.CompressedRgbaS3tcDxt5Ext;
 				glFormat = (PixelFormat)All.CompressedTextureFormats;
 				break;
-			
-			case SurfaceFormat.Single:
-				glInternalFormat = PixelInternalFormat.R32f;
-				glFormat = PixelFormat.Red;
-				glType = PixelType.Float;
-				break;
 #endif
 				
 #if IPHONE || ANDROID
